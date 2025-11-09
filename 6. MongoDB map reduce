@@ -1,0 +1,64 @@
+# 1) Start MongoDB service
+sudo systemctl start mongod
+
+# 2) Open the Mongo shell
+mongosh
+
+
+// ============================================================
+// PROBLEM STATEMENT - 6  (MongoDB MapReduce)
+// Goal: Total amount spent by each customer on product purchases
+// Collection: customer (cid, cname, amount, product_name)
+// DB: retailDB
+// ============================================================
+
+use retailDB                  // create/switch to the DB
+db.customer.drop()            // clean old data (safe to re-run)
+db.spend_by_customer.drop()   // clean old output (if exists)
+
+// ------------------------------------------------------------
+// Step 1: Insert simple sample data (easy-to-read values)
+// ------------------------------------------------------------
+db.customer.insertMany([
+  { cid: 1, cname: "Customer A", amount:  500, product_name: "Pen"       },
+  { cid: 1, cname: "Customer A", amount: 1500, product_name: "Notebook"  },
+  { cid: 2, cname: "Customer B", amount:  800, product_name: "Pencil"    },
+  { cid: 3, cname: "Customer C", amount: 1200, product_name: "Bag"       },
+  { cid: 2, cname: "Customer B", amount:  200, product_name: "Eraser"    }
+])
+
+// ------------------------------------------------------------
+// Step 2: Define Map and Reduce functions
+//   - map: emit each purchase keyed by customer name (cname)
+//   - reduce: sum the amounts for each customer
+// ------------------------------------------------------------
+var mapFn = function () {
+  // key = customer name, value = amount of this purchase
+  emit(this.cname, this.amount);
+};
+
+var reduceFn = function (key, values) {
+  // sum all amounts for that customer
+  return Array.sum(values);
+};
+
+// ------------------------------------------------------------
+// Step 3: Run MapReduce and write results to a new collection
+//   Output collection: spend_by_customer
+//   Each output doc looks like: { _id: "<cname>", value: <totalAmount> }
+// ------------------------------------------------------------
+db.customer.mapReduce(
+  mapFn,
+  reduceFn,
+  { out: "spend_by_customer" }
+);
+
+// ------------------------------------------------------------
+// Step 4: View summarized report (sorted by customer name)
+// ------------------------------------------------------------
+print("\nTotal amount spent by each customer:");
+db.spend_by_customer.find().sort({ _id: 1 }).pretty();
+
+// (Optional) View raw input and output for verification
+// db.customer.find().pretty()
+// db.spend_by_customer.find().pretty()
