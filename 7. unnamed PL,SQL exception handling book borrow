@@ -1,0 +1,112 @@
+-- ============================================================
+-- PROBLEM STATEMENT – 7  (MySQL version, run inside `sudo mysql`)
+-- Tables:
+--   Borrower(Roll_no, Name, Date_of_Issue, Name_of_Book, Status)
+--   Fine(Roll_no, Date, Amt)
+-- Logic:
+--   - Accept Roll_no and Name_of_Book
+--   - Compute days = today - Date_of_Issue
+--   - If 15–30 days: fine = Rs 5 per day
+--   - If >30 days: fine = (first 30 days @ Rs 5/day) + (remaining days @ Rs 50/day)
+--   - <=14 days: no fine
+--   - After return: Status changes I → R
+--   - If fine > 0: insert into Fine(Roll_no, Date, Amt)
+-- ============================================================
+
+-- Fresh workspace (optional)
+DROP DATABASE IF EXISTS librarydb_ps7;
+CREATE DATABASE librarydb_ps7;
+USE librarydb_ps7;
+
+-- 1) Create tables
+CREATE TABLE Borrower (
+  Roll_no       INT       NOT NULL,
+  Name          VARCHAR(50) NOT NULL,
+  Date_of_Issue DATE      NOT NULL,
+  Name_of_Book  VARCHAR(100) NOT NULL,
+  Status        CHAR(1)   NOT NULL DEFAULT 'I',     -- I = Issued, R = Returned
+  PRIMARY KEY (Roll_no, Name_of_Book)
+);
+
+CREATE TABLE Fine (
+  Roll_no INT,
+  Date    DATE,
+  Amt     DECIMAL(10,2)
+);
+
+-- 2) Sample data (dates relative to today so it works any day you run it)
+INSERT INTO Borrower VALUES
+(1,'Rohan', DATE_SUB(CURDATE(), INTERVAL 10 DAY), 'Book A','I'),  -- 10 days -> no fine
+(2,'Priya', DATE_SUB(CURDATE(), INTERVAL 20 DAY), 'Book B','I'),  -- 20 days -> 20*5
+(3,'Aditi', DATE_SUB(CURDATE(), INTERVAL 35 DAY), 'Book C','I');  -- 35 days -> 30*5 + 5*50
+
+-- 3) Procedure to process a return
+DROP PROCEDURE IF EXISTS return_book;
+DELIMITER $$
+
+CREATE PROCEDURE return_book(IN p_roll INT, IN p_book VARCHAR(100))
+BEGIN
+  DECLARE v_issue DATE;
+  DECLARE v_status CHAR(1);
+  DECLARE v_days INT DEFAULT 0;
+  DECLARE v_amt  DECIMAL(10,2) DEFAULT 0;
+
+  -- Fetch the borrow record
+  SELECT Date_of_Issue, Status
+    INTO v_issue, v_status
+  FROM Borrower
+  WHERE Roll_no = p_roll AND Name_of_Book = p_book
+  LIMIT 1;
+
+  -- Not found?
+  IF v_issue IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Borrow record not found for given Roll_no & Book';
+  END IF;
+
+  -- Already returned?
+  IF v_status = 'R' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This book is already marked as Returned';
+  END IF;
+
+  -- Days kept
+  SET v_days = DATEDIFF(CURDATE(), v_issue);
+
+  -- Fine calculation per rules
+  IF v_days BETWEEN 15 AND 30 THEN
+    SET v_amt = v_days * 5;
+  ELSEIF v_days > 30 THEN
+    -- First 30 days @ Rs 5/day, beyond 30 @ Rs 50/day
+    SET v_amt = (30 * 5) + ((v_days - 30) * 50);
+  ELSE
+    SET v_amt = 0;
+  END IF;
+
+  -- Mark as Returned
+  UPDATE Borrower
+     SET Status = 'R'
+   WHERE Roll_no = p_roll AND Name_of_Book = p_book;
+
+  -- Record fine if applicable
+  IF v_amt > 0 THEN
+    INSERT INTO Fine (Roll_no, Date, Amt)
+    VALUES (p_roll, CURDATE(), v_amt);
+  END IF;
+
+  -- Return a small summary row for quick checking
+  SELECT p_roll AS Roll_no, p_book AS Book, v_days AS days_kept, v_amt AS fine_amount;
+END $$
+DELIMITER ;
+
+-- 4) Demo calls (you can comment these out in submission if needed)
+-- Case 1: 10 days -> no fine; status becomes R
+CALL return_book(1,'Book A');
+
+-- Case 2: 20 days -> 20 * 5 = 100 fine
+CALL return_book(2,'Book B');
+
+-- Case 3: 35 days -> (30*5) + (5*50) = 150 + 250 = 400 fine
+CALL return_book(3,'Book C');
+
+-- 5) See results
+SELECT * FROM Borrower ORDER BY Roll_no;
+SELECT * FROM Fine ORDER BY Date, Roll_no;
