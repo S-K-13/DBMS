@@ -1,0 +1,99 @@
+-- ============================================================
+-- STEP 0: Fresh database
+-- ============================================================
+DROP DATABASE IF EXISTS rollmerge_db;
+CREATE DATABASE rollmerge_db;
+USE rollmerge_db;
+
+-- ============================================================
+-- STEP 1: Tables (old vs new roll-call)
+--    We'll use (roll INT PRIMARY KEY, name VARCHAR)
+-- ============================================================
+CREATE TABLE O_Roll_Call (
+  roll INT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE N_Roll_Call (
+  roll INT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL
+);
+
+-- ============================================================
+-- STEP 2: Sample data
+--    O_Roll_Call already has some rows
+--    N_Roll_Call has some new rows + a duplicate to test skipping
+-- ============================================================
+INSERT INTO O_Roll_Call (roll, name) VALUES
+(1, 'Riya'),
+(2, 'Aman');
+
+INSERT INTO N_Roll_Call (roll, name) VALUES
+(2, 'Aman'),      -- duplicate (should be skipped)
+(3, 'Sana'),
+(4, 'Nitin');
+
+-- ============================================================
+-- STEP 3: Stored Procedure with PARAMETERIZED CURSOR
+--    proc_merge_rolls(p_min_roll INT)
+--    - Iterates through N_Roll_Call rows WHERE roll >= p_min_roll
+--    - If not present in O_Roll_Call, inserts it; else skips
+--    - Reports number of inserted and skipped rows at the end
+-- ============================================================
+DROP PROCEDURE IF EXISTS proc_merge_rolls;
+
+DELIMITER $$
+
+CREATE PROCEDURE proc_merge_rolls(IN p_min_roll INT)
+BEGIN
+  -- 3.1: Declarations (variables, then cursor, then handler)
+  DECLARE v_roll  INT;
+  DECLARE v_name  VARCHAR(50);
+  DECLARE v_done  INT DEFAULT 0;
+  DECLARE v_inserted INT DEFAULT 0;
+  DECLARE v_skipped  INT DEFAULT 0;
+
+  -- 3.2: Parameterized cursor: only merge rows from N_Roll_Call meeting the filter
+  DECLARE c_merge CURSOR FOR
+    SELECT roll, name FROM N_Roll_Call
+    WHERE roll >= p_min_roll
+    ORDER BY roll;
+
+  -- 3.3: Handler: when no more rows to fetch
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
+
+  -- 3.4: Open cursor and process
+  OPEN c_merge;
+
+  read_loop: LOOP
+    FETCH c_merge INTO v_roll, v_name;
+    IF v_done = 1 THEN
+      LEAVE read_loop;
+    END IF;
+
+    -- 3.5: Skip if already exists in O_Roll_Call; otherwise insert
+    IF EXISTS (SELECT 1 FROM O_Roll_Call WHERE roll = v_roll) THEN
+      SET v_skipped = v_skipped + 1;
+    ELSE
+      INSERT INTO O_Roll_Call (roll, name) VALUES (v_roll, v_name);
+      SET v_inserted = v_inserted + 1;
+    END IF;
+  END LOOP;
+
+  CLOSE c_merge;
+
+  -- 3.6: Report summary (since MySQL doesn't have DBMS_OUTPUT)
+  SELECT v_inserted AS rows_inserted, v_skipped AS rows_skipped;
+END $$
+DELIMITER ;
+
+-- ============================================================
+-- STEP 4: Run the merge (choose a minimum roll filter)
+--    Example: merge everything (>= 1)
+-- ============================================================
+CALL proc_merge_rolls(1);
+
+-- ============================================================
+-- STEP 5: Verify the final O_Roll_Call (should include 1,2 from old, plus 3,4 added)
+-- ============================================================
+SELECT * FROM O_Roll_Call ORDER BY roll;
