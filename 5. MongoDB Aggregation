@@ -1,0 +1,87 @@
+// ============================================================
+// PROBLEM STATEMENT - 5 : MongoDB Aggregation
+// ============================================================
+// Database name: libraryDB
+// Collection name: books
+// ============================================================
+
+
+# 1. Start MongoDB service
+sudo systemctl start mongod
+
+# 2. Open Mongo shell
+mongosh
+
+
+
+use libraryDB       // create/switch to database
+db.books.drop()     // clear any old data
+
+// ============================================================
+// Step 1: Insert simple sample data
+// ============================================================
+db.books.insertMany([
+  { title: "Book A", author: "Author X", genre: "Fiction",     price: 400,  published_date: ISODate("2019-03-10") },
+  { title: "Book B", author: "Author Y", genre: "Fiction",     price: 300,  published_date: ISODate("2020-06-20") },
+  { title: "Book C", author: "Author X", genre: "Science",     price: 700,  published_date: ISODate("2021-01-15") },
+  { title: "Book D", author: "Author Z", genre: "History",     price: 250,  published_date: ISODate("2018-11-02") },
+  { title: "Book E", author: "Author Y", genre: "Science",     price: 900,  published_date: ISODate("2022-04-25") },
+  { title: "Book F", author: "Author W", genre: "Comics",      price: 150,  published_date: ISODate("2023-02-10") },
+  { title: "Book G", author: "Author X", genre: "Fiction",     price: 550,  published_date: ISODate("2024-03-05") },
+  { title: "Book H", author: "Author W", genre: "Comics",      price: 350,  published_date: ISODate("2021-09-01") }
+])
+
+// ============================================================
+// Step 2: Aggregation Queries
+// ============================================================
+
+// 1️⃣ Average price of all books
+print("\n1) Average price of all books")
+db.books.aggregate([
+  { $group: { _id: null, AveragePrice: { $avg: "$price" } } }
+])
+
+// 2️⃣ Count of books in each genre
+print("\n2) Count of books in each genre")
+db.books.aggregate([
+  { $group: { _id: "$genre", TotalBooks: { $sum: 1 } } },
+  { $sort: { _id: 1 } }
+])
+
+// 3️⃣ Most expensive book in each genre
+print("\n3) Most expensive book in each genre")
+db.books.aggregate([
+  { $sort: { genre: 1, price: -1 } },
+  { $group: { _id: "$genre", Book: { $first: "$title" }, MaxPrice: { $first: "$price" } } },
+  { $sort: { _id: 1 } }
+])
+
+// 4️⃣ Author(s) who have written maximum books
+print("\n4) Author who wrote the maximum number of books")
+db.books.aggregate([
+  { $group: { _id: "$author", BookCount: { $sum: 1 } } },
+  { $sort: { BookCount: -1 } },
+  { $limit: 1 }
+])
+
+// 5️⃣ Sort books by published date (descending)
+print("\n5) Books sorted by published date (latest first)")
+db.books.find({}, { _id: 0, title: 1, published_date: 1 }).sort({ published_date: -1 }).pretty()
+
+// 6️⃣ Sort books by price (ascending)
+print("\n6) Books sorted by price (lowest first)")
+db.books.find({}, { _id: 0, title: 1, price: 1 }).sort({ price: 1 }).pretty()
+
+// 7️⃣ Create index on 'title' and show index details
+print("\n7) Create index on 'title' and show index details")
+db.books.createIndex({ title: 1 })
+db.books.getIndexes()
+
+// ============================================================
+// Step 3: Optional - View all data neatly
+// ============================================================
+print("\nAll documents in books collection:")
+db.books.find().pretty()
+
+
+exit
