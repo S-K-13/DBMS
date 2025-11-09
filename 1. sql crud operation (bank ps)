@@ -1,0 +1,140 @@
+-- =====================================================
+-- Step 1  Create and use the database
+-- =====================================================
+CREATE DATABASE bankdb;
+USE bankdb;
+
+-- =====================================================
+-- Step 2  Create tables
+-- =====================================================
+
+CREATE TABLE branch(
+  branch_name  VARCHAR(30) PRIMARY KEY,
+  branch_city  VARCHAR(30),
+  assets_amt   DECIMAL(12,2)
+);
+
+CREATE TABLE customer(
+  cust_name   VARCHAR(30) PRIMARY KEY,
+  cust_street VARCHAR(40),
+  cust_city   VARCHAR(30)
+);
+
+CREATE TABLE account(
+  acc_no      INT PRIMARY KEY,
+  branch_name VARCHAR(30),
+  balance     DECIMAL(12,2),
+  FOREIGN KEY(branch_name) REFERENCES branch(branch_name)
+);
+
+CREATE TABLE loan(
+  loan_no     INT PRIMARY KEY,
+  branch_name VARCHAR(30),
+  amount      DECIMAL(12,2),
+  FOREIGN KEY(branch_name) REFERENCES branch(branch_name)
+);
+
+CREATE TABLE depositor(
+  cust_name VARCHAR(30),
+  acc_no    INT,
+  PRIMARY KEY(cust_name,acc_no),
+  FOREIGN KEY(cust_name) REFERENCES customer(cust_name),
+  FOREIGN KEY(acc_no)    REFERENCES account(acc_no)
+);
+
+CREATE TABLE borrower(
+  cust_name VARCHAR(30),
+  loan_no   INT,
+  PRIMARY KEY(cust_name,loan_no),
+  FOREIGN KEY(cust_name) REFERENCES customer(cust_name),
+  FOREIGN KEY(loan_no)   REFERENCES loan(loan_no)
+);
+
+-- =====================================================
+-- Step 3  Insert sample data
+-- =====================================================
+
+INSERT INTO branch VALUES
+('Pimpri','Pune',5000000),
+('Akurdi','Pune',3000000),
+('Nigdi','Pune',2500000);
+
+INSERT INTO customer VALUES
+('Sunil','MG Road','Pune'),
+('Priya','Akurdi Gaon','Pune'),
+('Amit','Nigdi Chowk','Pune'),
+('Riya','Nashik Phata','Pune');
+
+INSERT INTO account VALUES
+(1001,'Pimpri',15000),
+(1002,'Akurdi',9000),
+(1003,'Pimpri',22000),
+(1004,'Nigdi',12000);
+
+INSERT INTO depositor VALUES
+('Sunil',1001),
+('Priya',1002),
+('Amit',1004),
+('Riya',1003);
+
+INSERT INTO loan VALUES
+(5001,'Pimpri',15000),
+(5002,'Pimpri',12000),
+(5003,'Akurdi',20000);
+
+INSERT INTO borrower VALUES
+('Sunil',5001),
+('Riya',5002),
+('Priya',5003);
+
+-- =====================================================
+-- Step 4  Queries (solutions 2 – 11)
+-- =====================================================
+
+-- 2 Branches appearing in Loan table
+SELECT DISTINCT branch_name FROM loan;
+
+-- 3 Loan numbers for loans at Pimpri branch > 12000
+SELECT loan_no FROM loan
+WHERE branch_name='Pimpri' AND amount>12000;
+
+-- 4 Customers who have a loan (name, loan_no, amount)
+SELECT borrower.cust_name, loan.loan_no, loan.amount
+FROM borrower
+JOIN loan ON borrower.loan_no=loan.loan_no;
+
+-- 5 Customers with loan from Akurdi branch (alphabetical)
+SELECT borrower.cust_name
+FROM borrower
+JOIN loan ON borrower.loan_no=loan.loan_no
+WHERE loan.branch_name='Akurdi'
+ORDER BY borrower.cust_name;
+
+-- 6 Customers who have an account OR a loan
+SELECT cust_name FROM depositor
+UNION
+SELECT cust_name FROM borrower;
+
+-- 7 Customers who have both account AND loan
+SELECT DISTINCT d.cust_name
+FROM depositor AS d
+JOIN borrower AS b ON d.cust_name=b.cust_name;
+
+-- 8 Average account balance at Pimpri branch
+SELECT AVG(balance) AS avg_balance_pimpri
+FROM account
+WHERE branch_name='Pimpri';
+
+-- 9 Average account balance at each branch
+SELECT branch_name, AVG(balance) AS avg_balance
+FROM account
+GROUP BY branch_name;
+
+-- 10 Branches where average account balance > 12000
+SELECT branch_name
+FROM account
+GROUP BY branch_name
+HAVING AVG(balance) > 12000;
+
+-- 11 Total loan amount given by bank
+SELECT SUM(amount) AS total_loan_amount FROM loan;
