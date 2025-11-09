@@ -1,0 +1,104 @@
+// ============================================================
+// STEP 0: Switch to (or create) your MongoDB database
+// ============================================================
+
+sudo systemctl start mongod
+mongosh
+
+use collegeDB
+
+// ============================================================
+// STEP 1: Create and insert sample data into Teachers collection
+// ============================================================
+db.Teachers.insertMany([
+  { Tname: "Praveen", dno: 101, dname: "Computer", experience: 8, salary: 12000, date_of_joining: "2018-06-10" },
+  { Tname: "Riya", dno: 102, dname: "IT", experience: 5, salary: 9500, date_of_joining: "2019-01-15" },
+  { Tname: "Aditi", dno: 103, dname: "E&TC", experience: 6, salary: 11000, date_of_joining: "2020-07-10" },
+  { Tname: "Nitin", dno: 104, dname: "Computer", experience: 10, salary: 18000, date_of_joining: "2016-03-02" },
+  { Tname: "Priya", dno: 105, dname: "Mechanical", experience: 3, salary: 8000, date_of_joining: "2022-02-20" }
+])
+
+// ============================================================
+// STEP 2: Create and insert sample data into Students collection
+// ============================================================
+db.Students.insertMany([
+  { Sname: "Aman", roll_no: 1, class: "SE Comp" },
+  { Sname: "Sana", roll_no: 2, class: "TE IT" },
+  { Sname: "XYZ", roll_no: 3, class: "BE E&TC" },
+  { Sname: "Rohan", roll_no: 4, class: "SE Comp" }
+])
+
+// ============================================================
+// STEP 3: CRUD Operations as per Problem Statement
+// ============================================================
+
+// 1️⃣ Find all teachers alphabetically
+db.Teachers.find().sort({ Tname: 1 }).pretty()
+
+// 2️⃣ Find all teachers from the Computer department
+db.Teachers.find({ dname: "Computer" }).pretty()
+
+// 3️⃣ Find all teachers from Computer, IT, and E&TC departments
+db.Teachers.find({ dname: { $in: ["Computer", "IT", "E&TC"] } }).pretty()
+
+// 4️⃣ Find all teachers from Computer, IT, E&TC departments with salary >= 10000
+db.Teachers.find({
+  dname: { $in: ["Computer", "IT", "E&TC"] },
+  salary: { $gte: 10000 }
+}).pretty()
+
+// 5️⃣ Find student info where roll_no = 2 or Sname = "XYZ"
+db.Students.find({
+  $or: [
+    { roll_no: 2 },
+    { Sname: "XYZ" }
+  ]
+}).pretty()
+
+// 6️⃣ Update experience of teacher "Praveen" to 10 years
+//     If not found, insert a new document
+db.Teachers.updateOne(
+  { Tname: "Praveen" },
+  {
+    $set: {
+      experience: 10,
+      dno: 101,
+      dname: "Computer",
+      salary: 12000,
+      date_of_joining: "2018-06-10"
+    }
+  },
+  { upsert: true }
+)
+
+// 7️⃣ Update department of all teachers in IT department to COMP
+db.Teachers.updateMany(
+  { dname: "IT" },
+  { $set: { dname: "COMP" } }
+)
+
+// 8️⃣ Find teacher’s name and experience from Teachers collection
+db.Teachers.find({}, { Tname: 1, experience: 1, _id: 0 }).pretty()
+
+// 9️⃣ Delete all teachers from Teachers collection having IT dept
+db.Teachers.deleteMany({ dname: "IT" })
+
+// 🔟 Display first 3 teachers alphabetically (ascending order) with pretty()
+db.Teachers.find().sort({ Tname: 1 }).limit(3).pretty()
+
+// ============================================================
+// STEP 4: Verification
+// ============================================================
+
+// Show all collections
+show collections
+
+// Show final Teachers and Students data
+db.Teachers.find().pretty()
+db.Students.find().pretty()
+
+// ============================================================
+// END OF PROGRAM
+// ============================================================
+exit
+
