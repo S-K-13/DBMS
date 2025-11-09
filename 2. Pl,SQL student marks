@@ -1,0 +1,86 @@
+-- ============================================================
+-- STEP 0: Create & use database
+-- ============================================================
+DROP DATABASE IF EXISTS studentdb;
+CREATE DATABASE studentdb;
+USE studentdb;
+
+-- ============================================================
+-- STEP 1: Create tables (MySQL data types)
+-- ============================================================
+CREATE TABLE Stud_Marks (
+  name VARCHAR(50) PRIMARY KEY,
+  total_marks INT NOT NULL
+);
+
+CREATE TABLE Result (
+  roll  INT PRIMARY KEY,
+  name  VARCHAR(50),
+  class VARCHAR(50)
+);
+
+-- ============================================================
+-- STEP 2: Insert sample data
+-- ============================================================
+INSERT INTO Stud_Marks VALUES ('Riya', 1200);
+INSERT INTO Stud_Marks VALUES ('Aman',  950);
+INSERT INTO Stud_Marks VALUES ('Sana',  880);
+INSERT INTO Stud_Marks VALUES ('Nitin', 830);
+
+-- ============================================================
+-- STEP 3: Create procedure (MySQL syntax)
+-- ============================================================
+DROP PROCEDURE IF EXISTS proc_Grade;
+
+DELIMITER $$
+
+CREATE PROCEDURE proc_Grade(IN p_name VARCHAR(50), IN p_roll INT)
+BEGIN
+  DECLARE v_marks INT;
+  DECLARE v_class VARCHAR(30);
+
+  -- Get marks of given student
+  SELECT total_marks INTO v_marks
+  FROM Stud_Marks
+  WHERE name = p_name
+  LIMIT 1;
+
+  -- Check if student exists
+  IF v_marks IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Student not found in Stud_Marks';
+  END IF;
+
+  -- Categorize student
+  IF v_marks BETWEEN 990 AND 1500 THEN
+    SET v_class = 'Distinction';
+  ELSEIF v_marks BETWEEN 900 AND 989 THEN
+    SET v_class = 'First Class';
+  ELSEIF v_marks BETWEEN 825 AND 899 THEN
+    SET v_class = 'Higher Second Class';
+  ELSE
+    SET v_class = 'Fail';
+  END IF;
+
+  -- Insert or update result
+  INSERT INTO Result (roll, name, class)
+  VALUES (p_roll, p_name, v_class)
+  ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    class = VALUES(class);
+END $$
+
+DELIMITER ;
+
+-- ============================================================
+-- STEP 4: Call procedure for each student
+-- ============================================================
+CALL proc_Grade('Riya',  1);
+CALL proc_Grade('Aman',  2);
+CALL proc_Grade('Sana',  3);
+CALL proc_Grade('Nitin', 4);
+
+-- ============================================================
+-- STEP 5: View results
+-- ============================================================
+SELECT * FROM Result ORDER BY roll;
